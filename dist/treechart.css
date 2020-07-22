@@ -1,0 +1,12 @@
+rect.box {
+  cursor: pointer;
+  transition: fill-opacity 500ms;
+}
+
+rect.box.fade {
+  fill-opacity: 0.1 !important;
+}
+
+rect.box.selected {
+  fill-opacity: 1 !important;
+}
