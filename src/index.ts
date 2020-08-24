@@ -1,6 +1,6 @@
 import { extent } from "d3-array";
 import { nest } from "d3-collection";
-import { event, select, selectAll } from "d3-selection";
+import { select, selectAll } from "d3-selection";
 import { scaleLinear, scaleOrdinal } from "d3-scale";
 import { schemePaired } from "d3-scale-chromatic";
 import { hierarchy, treemap, treemapResquarify } from "d3-hierarchy";
@@ -187,7 +187,7 @@ export class Treechart {
             .attr("fill-opacity", (d: any) => this._opacity(d.data.value))
             .attr("width", (d: any) => d.x1 - d.x0)
             .attr("height", (d: any) => d.y1 - d.y0)
-            .on("click", (d: any, i: number, nodes: Node[]) => this._seriesClickHandler(nodes[i] as Element));
+            .on("click", (event: any) => this._seriesClickHandler(event));
 
           leaf.append("clipPath")
             .attr("id", (d: any, i: number) => `${this._id}_clip${i}`)
@@ -233,8 +233,10 @@ export class Treechart {
     return n.entries(data).map(d => hierarchy(d, 0));
   }
 
-  private _seriesClickHandler(el: Element): void {
+  private _seriesClickHandler(event: any): void {
     event.stopPropagation();
+    const el = event.target;
+
     const exit = el === this._selected ? true : false;
     this.clearSelection();
     if (exit) {
