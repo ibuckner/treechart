@@ -1231,51 +1231,6 @@ function initRange(domain, range) {
   return this;
 }
 
-const implicit = Symbol("implicit");
-
-function ordinal() {
-  var index = new Map(),
-      domain = [],
-      range = [],
-      unknown = implicit;
-
-  function scale(d) {
-    var key = d + "", i = index.get(key);
-    if (!i) {
-      if (unknown !== implicit) return unknown;
-      index.set(key, i = domain.push(d));
-    }
-    return range[(i - 1) % range.length];
-  }
-
-  scale.domain = function(_) {
-    if (!arguments.length) return domain.slice();
-    domain = [], index = new Map();
-    for (const value of _) {
-      const key = value + "";
-      if (index.has(key)) continue;
-      index.set(key, domain.push(value));
-    }
-    return scale;
-  };
-
-  scale.range = function(_) {
-    return arguments.length ? (range = Array.from(_), scale) : range.slice();
-  };
-
-  scale.unknown = function(_) {
-    return arguments.length ? (unknown = _, scale) : unknown;
-  };
-
-  scale.copy = function() {
-    return ordinal(domain, range).unknown(unknown);
-  };
-
-  initRange.apply(scale, arguments);
-
-  return scale;
-}
-
 function define(constructor, factory, prototype) {
   constructor.prototype = factory.prototype = prototype;
   prototype.constructor = constructor;
@@ -2403,14 +2358,6 @@ function linear$1() {
   return linearish(scale);
 }
 
-function colors(specifier) {
-  var n = specifier.length / 6 | 0, colors = new Array(n), i = 0;
-  while (i < n) colors[i] = "#" + specifier.slice(i * 6, ++i * 6);
-  return colors;
-}
-
-var schemePaired = colors("a6cee31f78b4b2df8a33a02cfb9a99e31a1cfdbf6fff7f00cab2d66a3d9affff99b15928");
-
 function count(node) {
   var sum = 0,
       children = node.children,
@@ -2879,12 +2826,974 @@ var treemapResquarify = (function custom(ratio) {
   return resquarify;
 })(phi);
 
-/**
- * Returns the x,y pair measurement
- * @param referenceElement - element to position targetElement by
- * @param targetElement - element that will receive position values
- * @param padding - (optional) additional padding to account for
- */
+var xhtml$1 = "http://www.w3.org/1999/xhtml";
+
+var namespaces$1 = {
+  svg: "http://www.w3.org/2000/svg",
+  xhtml: xhtml$1,
+  xlink: "http://www.w3.org/1999/xlink",
+  xml: "http://www.w3.org/XML/1998/namespace",
+  xmlns: "http://www.w3.org/2000/xmlns/"
+};
+
+function namespace$1(name) {
+  var prefix = name += "", i = prefix.indexOf(":");
+  if (i >= 0 && (prefix = name.slice(0, i)) !== "xmlns") name = name.slice(i + 1);
+  return namespaces$1.hasOwnProperty(prefix) ? {space: namespaces$1[prefix], local: name} : name; // eslint-disable-line no-prototype-builtins
+}
+
+function creatorInherit$1(name) {
+  return function() {
+    var document = this.ownerDocument,
+        uri = this.namespaceURI;
+    return uri === xhtml$1 && document.documentElement.namespaceURI === xhtml$1
+        ? document.createElement(name)
+        : document.createElementNS(uri, name);
+  };
+}
+
+function creatorFixed$1(fullname) {
+  return function() {
+    return this.ownerDocument.createElementNS(fullname.space, fullname.local);
+  };
+}
+
+function creator$1(name) {
+  var fullname = namespace$1(name);
+  return (fullname.local
+      ? creatorFixed$1
+      : creatorInherit$1)(fullname);
+}
+
+function none$1() {}
+
+function selector$1(selector) {
+  return selector == null ? none$1 : function() {
+    return this.querySelector(selector);
+  };
+}
+
+function selection_select$1(select) {
+  if (typeof select !== "function") select = selector$1(select);
+
+  for (var groups = this._groups, m = groups.length, subgroups = new Array(m), j = 0; j < m; ++j) {
+    for (var group = groups[j], n = group.length, subgroup = subgroups[j] = new Array(n), node, subnode, i = 0; i < n; ++i) {
+      if ((node = group[i]) && (subnode = select.call(node, node.__data__, i, group))) {
+        if ("__data__" in node) subnode.__data__ = node.__data__;
+        subgroup[i] = subnode;
+      }
+    }
+  }
+
+  return new Selection$1(subgroups, this._parents);
+}
+
+function array$1(x) {
+  return typeof x === "object" && "length" in x
+    ? x // Array, TypedArray, NodeList, array-like
+    : Array.from(x); // Map, Set, iterable, string, or anything else
+}
+
+function empty$1() {
+  return [];
+}
+
+function selectorAll$1(selector) {
+  return selector == null ? empty$1 : function() {
+    return this.querySelectorAll(selector);
+  };
+}
+
+function arrayAll$1(select) {
+  return function() {
+    var group = select.apply(this, arguments);
+    return group == null ? [] : array$1(group);
+  };
+}
+
+function selection_selectAll$1(select) {
+  if (typeof select === "function") select = arrayAll$1(select);
+  else select = selectorAll$1(select);
+
+  for (var groups = this._groups, m = groups.length, subgroups = [], parents = [], j = 0; j < m; ++j) {
+    for (var group = groups[j], n = group.length, node, i = 0; i < n; ++i) {
+      if (node = group[i]) {
+        subgroups.push(select.call(node, node.__data__, i, group));
+        parents.push(node);
+      }
+    }
+  }
+
+  return new Selection$1(subgroups, parents);
+}
+
+function matcher$1(selector) {
+  return function() {
+    return this.matches(selector);
+  };
+}
+
+function childMatcher$1(selector) {
+  return function(node) {
+    return node.matches(selector);
+  };
+}
+
+var find$1 = Array.prototype.find;
+
+function childFind$1(match) {
+  return function() {
+    return find$1.call(this.children, match);
+  };
+}
+
+function childFirst$1() {
+  return this.firstElementChild;
+}
+
+function selection_selectChild$1(match) {
+  return this.select(match == null ? childFirst$1
+      : childFind$1(typeof match === "function" ? match : childMatcher$1(match)));
+}
+
+var filter$1 = Array.prototype.filter;
+
+function children$1() {
+  return this.children;
+}
+
+function childrenFilter$1(match) {
+  return function() {
+    return filter$1.call(this.children, match);
+  };
+}
+
+function selection_selectChildren$1(match) {
+  return this.selectAll(match == null ? children$1
+      : childrenFilter$1(typeof match === "function" ? match : childMatcher$1(match)));
+}
+
+function selection_filter$1(match) {
+  if (typeof match !== "function") match = matcher$1(match);
+
+  for (var groups = this._groups, m = groups.length, subgroups = new Array(m), j = 0; j < m; ++j) {
+    for (var group = groups[j], n = group.length, subgroup = subgroups[j] = [], node, i = 0; i < n; ++i) {
+      if ((node = group[i]) && match.call(node, node.__data__, i, group)) {
+        subgroup.push(node);
+      }
+    }
+  }
+
+  return new Selection$1(subgroups, this._parents);
+}
+
+function sparse$1(update) {
+  return new Array(update.length);
+}
+
+function selection_enter$1() {
+  return new Selection$1(this._enter || this._groups.map(sparse$1), this._parents);
+}
+
+function EnterNode$1(parent, datum) {
+  this.ownerDocument = parent.ownerDocument;
+  this.namespaceURI = parent.namespaceURI;
+  this._next = null;
+  this._parent = parent;
+  this.__data__ = datum;
+}
+
+EnterNode$1.prototype = {
+  constructor: EnterNode$1,
+  appendChild: function(child) { return this._parent.insertBefore(child, this._next); },
+  insertBefore: function(child, next) { return this._parent.insertBefore(child, next); },
+  querySelector: function(selector) { return this._parent.querySelector(selector); },
+  querySelectorAll: function(selector) { return this._parent.querySelectorAll(selector); }
+};
+
+function constant$4(x) {
+  return function() {
+    return x;
+  };
+}
+
+function bindIndex$1(parent, group, enter, update, exit, data) {
+  var i = 0,
+      node,
+      groupLength = group.length,
+      dataLength = data.length;
+
+  // Put any non-null nodes that fit into update.
+  // Put any null nodes into enter.
+  // Put any remaining data into enter.
+  for (; i < dataLength; ++i) {
+    if (node = group[i]) {
+      node.__data__ = data[i];
+      update[i] = node;
+    } else {
+      enter[i] = new EnterNode$1(parent, data[i]);
+    }
+  }
+
+  // Put any non-null nodes that don’t fit into exit.
+  for (; i < groupLength; ++i) {
+    if (node = group[i]) {
+      exit[i] = node;
+    }
+  }
+}
+
+function bindKey$1(parent, group, enter, update, exit, data, key) {
+  var i,
+      node,
+      nodeByKeyValue = new Map,
+      groupLength = group.length,
+      dataLength = data.length,
+      keyValues = new Array(groupLength),
+      keyValue;
+
+  // Compute the key for each node.
+  // If multiple nodes have the same key, the duplicates are added to exit.
+  for (i = 0; i < groupLength; ++i) {
+    if (node = group[i]) {
+      keyValues[i] = keyValue = key.call(node, node.__data__, i, group) + "";
+      if (nodeByKeyValue.has(keyValue)) {
+        exit[i] = node;
+      } else {
+        nodeByKeyValue.set(keyValue, node);
+      }
+    }
+  }
+
+  // Compute the key for each datum.
+  // If there a node associated with this key, join and add it to update.
+  // If there is not (or the key is a duplicate), add it to enter.
+  for (i = 0; i < dataLength; ++i) {
+    keyValue = key.call(parent, data[i], i, data) + "";
+    if (node = nodeByKeyValue.get(keyValue)) {
+      update[i] = node;
+      node.__data__ = data[i];
+      nodeByKeyValue.delete(keyValue);
+    } else {
+      enter[i] = new EnterNode$1(parent, data[i]);
+    }
+  }
+
+  // Add any remaining nodes that were not bound to data to exit.
+  for (i = 0; i < groupLength; ++i) {
+    if ((node = group[i]) && (nodeByKeyValue.get(keyValues[i]) === node)) {
+      exit[i] = node;
+    }
+  }
+}
+
+function datum$1(node) {
+  return node.__data__;
+}
+
+function selection_data$1(value, key) {
+  if (!arguments.length) return Array.from(this, datum$1);
+
+  var bind = key ? bindKey$1 : bindIndex$1,
+      parents = this._parents,
+      groups = this._groups;
+
+  if (typeof value !== "function") value = constant$4(value);
+
+  for (var m = groups.length, update = new Array(m), enter = new Array(m), exit = new Array(m), j = 0; j < m; ++j) {
+    var parent = parents[j],
+        group = groups[j],
+        groupLength = group.length,
+        data = array$1(value.call(parent, parent && parent.__data__, j, parents)),
+        dataLength = data.length,
+        enterGroup = enter[j] = new Array(dataLength),
+        updateGroup = update[j] = new Array(dataLength),
+        exitGroup = exit[j] = new Array(groupLength);
+
+    bind(parent, group, enterGroup, updateGroup, exitGroup, data, key);
+
+    // Now connect the enter nodes to their following update node, such that
+    // appendChild can insert the materialized enter node before this node,
+    // rather than at the end of the parent node.
+    for (var i0 = 0, i1 = 0, previous, next; i0 < dataLength; ++i0) {
+      if (previous = enterGroup[i0]) {
+        if (i0 >= i1) i1 = i0 + 1;
+        while (!(next = updateGroup[i1]) && ++i1 < dataLength);
+        previous._next = next || null;
+      }
+    }
+  }
+
+  update = new Selection$1(update, parents);
+  update._enter = enter;
+  update._exit = exit;
+  return update;
+}
+
+function selection_exit$1() {
+  return new Selection$1(this._exit || this._groups.map(sparse$1), this._parents);
+}
+
+function selection_join$1(onenter, onupdate, onexit) {
+  var enter = this.enter(), update = this, exit = this.exit();
+  enter = typeof onenter === "function" ? onenter(enter) : enter.append(onenter + "");
+  if (onupdate != null) update = onupdate(update);
+  if (onexit == null) exit.remove(); else onexit(exit);
+  return enter && update ? enter.merge(update).order() : update;
+}
+
+function selection_merge$1(selection) {
+  if (!(selection instanceof Selection$1)) throw new Error("invalid merge");
+
+  for (var groups0 = this._groups, groups1 = selection._groups, m0 = groups0.length, m1 = groups1.length, m = Math.min(m0, m1), merges = new Array(m0), j = 0; j < m; ++j) {
+    for (var group0 = groups0[j], group1 = groups1[j], n = group0.length, merge = merges[j] = new Array(n), node, i = 0; i < n; ++i) {
+      if (node = group0[i] || group1[i]) {
+        merge[i] = node;
+      }
+    }
+  }
+
+  for (; j < m0; ++j) {
+    merges[j] = groups0[j];
+  }
+
+  return new Selection$1(merges, this._parents);
+}
+
+function selection_order$1() {
+
+  for (var groups = this._groups, j = -1, m = groups.length; ++j < m;) {
+    for (var group = groups[j], i = group.length - 1, next = group[i], node; --i >= 0;) {
+      if (node = group[i]) {
+        if (next && node.compareDocumentPosition(next) ^ 4) next.parentNode.insertBefore(node, next);
+        next = node;
+      }
+    }
+  }
+
+  return this;
+}
+
+function selection_sort$1(compare) {
+  if (!compare) compare = ascending$2;
+
+  function compareNode(a, b) {
+    return a && b ? compare(a.__data__, b.__data__) : !a - !b;
+  }
+
+  for (var groups = this._groups, m = groups.length, sortgroups = new Array(m), j = 0; j < m; ++j) {
+    for (var group = groups[j], n = group.length, sortgroup = sortgroups[j] = new Array(n), node, i = 0; i < n; ++i) {
+      if (node = group[i]) {
+        sortgroup[i] = node;
+      }
+    }
+    sortgroup.sort(compareNode);
+  }
+
+  return new Selection$1(sortgroups, this._parents).order();
+}
+
+function ascending$2(a, b) {
+  return a < b ? -1 : a > b ? 1 : a >= b ? 0 : NaN;
+}
+
+function selection_call$1() {
+  var callback = arguments[0];
+  arguments[0] = this;
+  callback.apply(null, arguments);
+  return this;
+}
+
+function selection_nodes$1() {
+  return Array.from(this);
+}
+
+function selection_node$1() {
+
+  for (var groups = this._groups, j = 0, m = groups.length; j < m; ++j) {
+    for (var group = groups[j], i = 0, n = group.length; i < n; ++i) {
+      var node = group[i];
+      if (node) return node;
+    }
+  }
+
+  return null;
+}
+
+function selection_size$1() {
+  let size = 0;
+  for (const node of this) ++size; // eslint-disable-line no-unused-vars
+  return size;
+}
+
+function selection_empty$1() {
+  return !this.node();
+}
+
+function selection_each$1(callback) {
+
+  for (var groups = this._groups, j = 0, m = groups.length; j < m; ++j) {
+    for (var group = groups[j], i = 0, n = group.length, node; i < n; ++i) {
+      if (node = group[i]) callback.call(node, node.__data__, i, group);
+    }
+  }
+
+  return this;
+}
+
+function attrRemove$1(name) {
+  return function() {
+    this.removeAttribute(name);
+  };
+}
+
+function attrRemoveNS$1(fullname) {
+  return function() {
+    this.removeAttributeNS(fullname.space, fullname.local);
+  };
+}
+
+function attrConstant$1(name, value) {
+  return function() {
+    this.setAttribute(name, value);
+  };
+}
+
+function attrConstantNS$1(fullname, value) {
+  return function() {
+    this.setAttributeNS(fullname.space, fullname.local, value);
+  };
+}
+
+function attrFunction$1(name, value) {
+  return function() {
+    var v = value.apply(this, arguments);
+    if (v == null) this.removeAttribute(name);
+    else this.setAttribute(name, v);
+  };
+}
+
+function attrFunctionNS$1(fullname, value) {
+  return function() {
+    var v = value.apply(this, arguments);
+    if (v == null) this.removeAttributeNS(fullname.space, fullname.local);
+    else this.setAttributeNS(fullname.space, fullname.local, v);
+  };
+}
+
+function selection_attr$1(name, value) {
+  var fullname = namespace$1(name);
+
+  if (arguments.length < 2) {
+    var node = this.node();
+    return fullname.local
+        ? node.getAttributeNS(fullname.space, fullname.local)
+        : node.getAttribute(fullname);
+  }
+
+  return this.each((value == null
+      ? (fullname.local ? attrRemoveNS$1 : attrRemove$1) : (typeof value === "function"
+      ? (fullname.local ? attrFunctionNS$1 : attrFunction$1)
+      : (fullname.local ? attrConstantNS$1 : attrConstant$1)))(fullname, value));
+}
+
+function defaultView$1(node) {
+  return (node.ownerDocument && node.ownerDocument.defaultView) // node is a Node
+      || (node.document && node) // node is a Window
+      || node.defaultView; // node is a Document
+}
+
+function styleRemove$1(name) {
+  return function() {
+    this.style.removeProperty(name);
+  };
+}
+
+function styleConstant$1(name, value, priority) {
+  return function() {
+    this.style.setProperty(name, value, priority);
+  };
+}
+
+function styleFunction$1(name, value, priority) {
+  return function() {
+    var v = value.apply(this, arguments);
+    if (v == null) this.style.removeProperty(name);
+    else this.style.setProperty(name, v, priority);
+  };
+}
+
+function selection_style$1(name, value, priority) {
+  return arguments.length > 1
+      ? this.each((value == null
+            ? styleRemove$1 : typeof value === "function"
+            ? styleFunction$1
+            : styleConstant$1)(name, value, priority == null ? "" : priority))
+      : styleValue$1(this.node(), name);
+}
+
+function styleValue$1(node, name) {
+  return node.style.getPropertyValue(name)
+      || defaultView$1(node).getComputedStyle(node, null).getPropertyValue(name);
+}
+
+function propertyRemove$1(name) {
+  return function() {
+    delete this[name];
+  };
+}
+
+function propertyConstant$1(name, value) {
+  return function() {
+    this[name] = value;
+  };
+}
+
+function propertyFunction$1(name, value) {
+  return function() {
+    var v = value.apply(this, arguments);
+    if (v == null) delete this[name];
+    else this[name] = v;
+  };
+}
+
+function selection_property$1(name, value) {
+  return arguments.length > 1
+      ? this.each((value == null
+          ? propertyRemove$1 : typeof value === "function"
+          ? propertyFunction$1
+          : propertyConstant$1)(name, value))
+      : this.node()[name];
+}
+
+function classArray$1(string) {
+  return string.trim().split(/^|\s+/);
+}
+
+function classList$1(node) {
+  return node.classList || new ClassList$1(node);
+}
+
+function ClassList$1(node) {
+  this._node = node;
+  this._names = classArray$1(node.getAttribute("class") || "");
+}
+
+ClassList$1.prototype = {
+  add: function(name) {
+    var i = this._names.indexOf(name);
+    if (i < 0) {
+      this._names.push(name);
+      this._node.setAttribute("class", this._names.join(" "));
+    }
+  },
+  remove: function(name) {
+    var i = this._names.indexOf(name);
+    if (i >= 0) {
+      this._names.splice(i, 1);
+      this._node.setAttribute("class", this._names.join(" "));
+    }
+  },
+  contains: function(name) {
+    return this._names.indexOf(name) >= 0;
+  }
+};
+
+function classedAdd$1(node, names) {
+  var list = classList$1(node), i = -1, n = names.length;
+  while (++i < n) list.add(names[i]);
+}
+
+function classedRemove$1(node, names) {
+  var list = classList$1(node), i = -1, n = names.length;
+  while (++i < n) list.remove(names[i]);
+}
+
+function classedTrue$1(names) {
+  return function() {
+    classedAdd$1(this, names);
+  };
+}
+
+function classedFalse$1(names) {
+  return function() {
+    classedRemove$1(this, names);
+  };
+}
+
+function classedFunction$1(names, value) {
+  return function() {
+    (value.apply(this, arguments) ? classedAdd$1 : classedRemove$1)(this, names);
+  };
+}
+
+function selection_classed$1(name, value) {
+  var names = classArray$1(name + "");
+
+  if (arguments.length < 2) {
+    var list = classList$1(this.node()), i = -1, n = names.length;
+    while (++i < n) if (!list.contains(names[i])) return false;
+    return true;
+  }
+
+  return this.each((typeof value === "function"
+      ? classedFunction$1 : value
+      ? classedTrue$1
+      : classedFalse$1)(names, value));
+}
+
+function textRemove$1() {
+  this.textContent = "";
+}
+
+function textConstant$1(value) {
+  return function() {
+    this.textContent = value;
+  };
+}
+
+function textFunction$1(value) {
+  return function() {
+    var v = value.apply(this, arguments);
+    this.textContent = v == null ? "" : v;
+  };
+}
+
+function selection_text$1(value) {
+  return arguments.length
+      ? this.each(value == null
+          ? textRemove$1 : (typeof value === "function"
+          ? textFunction$1
+          : textConstant$1)(value))
+      : this.node().textContent;
+}
+
+function htmlRemove$1() {
+  this.innerHTML = "";
+}
+
+function htmlConstant$1(value) {
+  return function() {
+    this.innerHTML = value;
+  };
+}
+
+function htmlFunction$1(value) {
+  return function() {
+    var v = value.apply(this, arguments);
+    this.innerHTML = v == null ? "" : v;
+  };
+}
+
+function selection_html$1(value) {
+  return arguments.length
+      ? this.each(value == null
+          ? htmlRemove$1 : (typeof value === "function"
+          ? htmlFunction$1
+          : htmlConstant$1)(value))
+      : this.node().innerHTML;
+}
+
+function raise$1() {
+  if (this.nextSibling) this.parentNode.appendChild(this);
+}
+
+function selection_raise$1() {
+  return this.each(raise$1);
+}
+
+function lower$1() {
+  if (this.previousSibling) this.parentNode.insertBefore(this, this.parentNode.firstChild);
+}
+
+function selection_lower$1() {
+  return this.each(lower$1);
+}
+
+function selection_append$1(name) {
+  var create = typeof name === "function" ? name : creator$1(name);
+  return this.select(function() {
+    return this.appendChild(create.apply(this, arguments));
+  });
+}
+
+function constantNull$1() {
+  return null;
+}
+
+function selection_insert$1(name, before) {
+  var create = typeof name === "function" ? name : creator$1(name),
+      select = before == null ? constantNull$1 : typeof before === "function" ? before : selector$1(before);
+  return this.select(function() {
+    return this.insertBefore(create.apply(this, arguments), select.apply(this, arguments) || null);
+  });
+}
+
+function remove$1() {
+  var parent = this.parentNode;
+  if (parent) parent.removeChild(this);
+}
+
+function selection_remove$1() {
+  return this.each(remove$1);
+}
+
+function selection_cloneShallow$1() {
+  var clone = this.cloneNode(false), parent = this.parentNode;
+  return parent ? parent.insertBefore(clone, this.nextSibling) : clone;
+}
+
+function selection_cloneDeep$1() {
+  var clone = this.cloneNode(true), parent = this.parentNode;
+  return parent ? parent.insertBefore(clone, this.nextSibling) : clone;
+}
+
+function selection_clone$1(deep) {
+  return this.select(deep ? selection_cloneDeep$1 : selection_cloneShallow$1);
+}
+
+function selection_datum$1(value) {
+  return arguments.length
+      ? this.property("__data__", value)
+      : this.node().__data__;
+}
+
+function contextListener$1(listener) {
+  return function(event) {
+    listener.call(this, event, this.__data__);
+  };
+}
+
+function parseTypenames$1(typenames) {
+  return typenames.trim().split(/^|\s+/).map(function(t) {
+    var name = "", i = t.indexOf(".");
+    if (i >= 0) name = t.slice(i + 1), t = t.slice(0, i);
+    return {type: t, name: name};
+  });
+}
+
+function onRemove$1(typename) {
+  return function() {
+    var on = this.__on;
+    if (!on) return;
+    for (var j = 0, i = -1, m = on.length, o; j < m; ++j) {
+      if (o = on[j], (!typename.type || o.type === typename.type) && o.name === typename.name) {
+        this.removeEventListener(o.type, o.listener, o.options);
+      } else {
+        on[++i] = o;
+      }
+    }
+    if (++i) on.length = i;
+    else delete this.__on;
+  };
+}
+
+function onAdd$1(typename, value, options) {
+  return function() {
+    var on = this.__on, o, listener = contextListener$1(value);
+    if (on) for (var j = 0, m = on.length; j < m; ++j) {
+      if ((o = on[j]).type === typename.type && o.name === typename.name) {
+        this.removeEventListener(o.type, o.listener, o.options);
+        this.addEventListener(o.type, o.listener = listener, o.options = options);
+        o.value = value;
+        return;
+      }
+    }
+    this.addEventListener(typename.type, listener, options);
+    o = {type: typename.type, name: typename.name, value: value, listener: listener, options: options};
+    if (!on) this.__on = [o];
+    else on.push(o);
+  };
+}
+
+function selection_on$1(typename, value, options) {
+  var typenames = parseTypenames$1(typename + ""), i, n = typenames.length, t;
+
+  if (arguments.length < 2) {
+    var on = this.node().__on;
+    if (on) for (var j = 0, m = on.length, o; j < m; ++j) {
+      for (i = 0, o = on[j]; i < n; ++i) {
+        if ((t = typenames[i]).type === o.type && t.name === o.name) {
+          return o.value;
+        }
+      }
+    }
+    return;
+  }
+
+  on = value ? onAdd$1 : onRemove$1;
+  for (i = 0; i < n; ++i) this.each(on(typenames[i], value, options));
+  return this;
+}
+
+function dispatchEvent$1(node, type, params) {
+  var window = defaultView$1(node),
+      event = window.CustomEvent;
+
+  if (typeof event === "function") {
+    event = new event(type, params);
+  } else {
+    event = window.document.createEvent("Event");
+    if (params) event.initEvent(type, params.bubbles, params.cancelable), event.detail = params.detail;
+    else event.initEvent(type, false, false);
+  }
+
+  node.dispatchEvent(event);
+}
+
+function dispatchConstant$1(type, params) {
+  return function() {
+    return dispatchEvent$1(this, type, params);
+  };
+}
+
+function dispatchFunction$1(type, params) {
+  return function() {
+    return dispatchEvent$1(this, type, params.apply(this, arguments));
+  };
+}
+
+function selection_dispatch$1(type, params) {
+  return this.each((typeof params === "function"
+      ? dispatchFunction$1
+      : dispatchConstant$1)(type, params));
+}
+
+function* selection_iterator$1() {
+  for (var groups = this._groups, j = 0, m = groups.length; j < m; ++j) {
+    for (var group = groups[j], i = 0, n = group.length, node; i < n; ++i) {
+      if (node = group[i]) yield node;
+    }
+  }
+}
+
+var root$1 = [null];
+
+function Selection$1(groups, parents) {
+  this._groups = groups;
+  this._parents = parents;
+}
+
+function selection$1() {
+  return new Selection$1([[document.documentElement]], root$1);
+}
+
+function selection_selection$1() {
+  return this;
+}
+
+Selection$1.prototype = selection$1.prototype = {
+  constructor: Selection$1,
+  select: selection_select$1,
+  selectAll: selection_selectAll$1,
+  selectChild: selection_selectChild$1,
+  selectChildren: selection_selectChildren$1,
+  filter: selection_filter$1,
+  data: selection_data$1,
+  enter: selection_enter$1,
+  exit: selection_exit$1,
+  join: selection_join$1,
+  merge: selection_merge$1,
+  selection: selection_selection$1,
+  order: selection_order$1,
+  sort: selection_sort$1,
+  call: selection_call$1,
+  nodes: selection_nodes$1,
+  node: selection_node$1,
+  size: selection_size$1,
+  empty: selection_empty$1,
+  each: selection_each$1,
+  attr: selection_attr$1,
+  style: selection_style$1,
+  property: selection_property$1,
+  classed: selection_classed$1,
+  text: selection_text$1,
+  html: selection_html$1,
+  raise: selection_raise$1,
+  lower: selection_lower$1,
+  append: selection_append$1,
+  insert: selection_insert$1,
+  remove: selection_remove$1,
+  clone: selection_clone$1,
+  datum: selection_datum$1,
+  on: selection_on$1,
+  dispatch: selection_dispatch$1,
+  [Symbol.iterator]: selection_iterator$1
+};
+
+function select$1(selector) {
+  return typeof selector === "string"
+      ? new Selection$1([[document.querySelector(selector)]], [document.documentElement])
+      : new Selection$1([[selector]], root$1);
+}
+
+function selectAll$1(selector) {
+  return typeof selector === "string"
+      ? new Selection$1([document.querySelectorAll(selector)], [document.documentElement])
+      : new Selection$1([selector == null ? [] : array$1(selector)], root$1);
+}
+
+function initRange$1(domain, range) {
+  switch (arguments.length) {
+    case 0: break;
+    case 1: this.range(domain); break;
+    default: this.range(range).domain(domain); break;
+  }
+  return this;
+}
+
+const implicit = Symbol("implicit");
+
+function ordinal() {
+  var index = new Map(),
+      domain = [],
+      range = [],
+      unknown = implicit;
+
+  function scale(d) {
+    var key = d + "", i = index.get(key);
+    if (!i) {
+      if (unknown !== implicit) return unknown;
+      index.set(key, i = domain.push(d));
+    }
+    return range[(i - 1) % range.length];
+  }
+
+  scale.domain = function(_) {
+    if (!arguments.length) return domain.slice();
+    domain = [], index = new Map();
+    for (const value of _) {
+      const key = value + "";
+      if (index.has(key)) continue;
+      index.set(key, domain.push(value));
+    }
+    return scale;
+  };
+
+  scale.range = function(_) {
+    return arguments.length ? (range = Array.from(_), scale) : range.slice();
+  };
+
+  scale.unknown = function(_) {
+    return arguments.length ? (unknown = _, scale) : unknown;
+  };
+
+  scale.copy = function() {
+    return ordinal(domain, range).unknown(unknown);
+  };
+
+  initRange$1.apply(scale, arguments);
+
+  return scale;
+}
+
+function colors(specifier) {
+  var n = specifier.length / 6 | 0, colors = new Array(n), i = 0;
+  while (i < n) colors[i] = "#" + specifier.slice(i * 6, ++i * 6);
+  return colors;
+}
+
+var schemePaired = colors("a6cee31f78b4b2df8a33a02cfb9a99e31a1cfdbf6fff7f00cab2d66a3d9affff99b15928");
 
 var resizeObservers = [];
 
@@ -3439,21 +4348,19 @@ function svg(container, options) {
     return svg;
 }
 
-var Treechart = /** @class */ (function () {
-    function Treechart(options) {
+class Basechart {
+    constructor(options) {
         this.container = document.querySelector("body");
         this.h = 200;
+        this.id = "basechart";
         this.locale = "en-GB";
-        this.margin = { bottom: 20, left: 20, right: 20, top: 20 };
+        this.margin = { bottom: 20, left: 20, right: 30, top: 20 };
         this.rh = 160;
         this.rw = 150;
+        this.scale = {};
         this.w = 200;
-        this._color = ordinal(schemePaired);
-        this._data = { series: [] };
-        this._extent = [0, 0];
-        this._id = "";
         if (options.margin !== undefined) {
-            var m = options.margin;
+            let m = options.margin;
             m.left = isNaN(m.left) ? 0 : m.left;
             m.right = isNaN(m.right) ? 0 : m.right;
             m.top = isNaN(m.top) ? 0 : m.top;
@@ -3463,187 +4370,192 @@ var Treechart = /** @class */ (function () {
         if (options.locale !== undefined) {
             this.locale = options.locale;
         }
+        if (options.container !== undefined) {
+            this.container = options.container;
+        }
+        const box = this.container.getBoundingClientRect();
+        this.h = box.height;
+        this.w = box.width;
+        this.rh = this.h - this.margin.top - this.margin.bottom;
+        this.rw = this.w - this.margin.left - this.margin.right;
+        this.scale.color = ordinal(schemePaired);
+        this.scale.x = (x) => x;
+        this.scale.y = (y) => y;
+    }
+    /**
+     * Clears selection from chart
+     */
+    clearSelection() {
+        selectAll$1(".selected").classed("selected", false);
+        selectAll$1(".fade").classed("fade", false);
+    }
+    /**
+     * Removes this chart from the DOM
+     */
+    destroy() {
+        select$1(this.container).select("svg").remove();
+        return this;
+    }
+    draw() {
+        if (select$1(this.container).select("svg").empty()) {
+            let sg = svg(this.container, {
+                height: this.h,
+                margin: this.margin,
+                width: this.w
+            });
+            const s = select$1(sg)
+                .on("click", () => this.clearSelection());
+            this.canvas = s.select(".canvas");
+        }
+        return this;
+    }
+}
+
+class Treechart extends Basechart {
+    constructor(options) {
+        super(options);
+        this._data = { series: [] };
+        this._extent = [0, 0];
         if (options.formatValue !== undefined) {
             this.formatValue = options.formatValue;
         }
         else {
             this.formatValue = new Intl.NumberFormat(this.locale, { maximumFractionDigits: 2, style: "decimal" });
         }
-        if (options.container !== undefined) {
-            this.container = options.container;
-        }
-        var box = this.container.getBoundingClientRect();
-        this.h = box.height;
-        this.w = box.width;
-        this.rh = this.h - this.margin.top - this.margin.bottom;
-        this.rw = this.w - this.margin.left - this.margin.right;
         this.data(options.data);
     }
-    /**
-     * Clears selection from Treechart
-     */
-    Treechart.prototype.clearSelection = function () {
-        selectAll(".selected").classed("selected", false);
-        selectAll(".fade").classed("fade", false);
-        this._selected = undefined;
-        return this;
-    };
     /**
      * Saves data into Treechart
      * @param data - Treechart data
      */
-    Treechart.prototype.data = function (data) {
-        var _this = this;
+    data(data) {
         this._data = data;
-        this._data.series.forEach(function (item) {
-            item.color = _this._color(item.category ? item.category : item.label);
+        this._data.series.forEach((item) => {
+            item.color = this.scale.color(item.category ? item.category : item.label);
         });
-        var dataNested = { name: "root", children: this._nest(this._data.series, function (d) { return d.category; }, function (d) { return d.label; }) };
-        var h = hierarchy(dataNested).sum(function (d) { return d.value; }).sort(function (a, b) { return b.value - a.value; });
-        var tree = function (d) { return treemap()
+        const dataNested = { name: "root", children: this._nest(this._data.series, (d) => d.category, (d) => d.label) };
+        const h = hierarchy(dataNested).sum((d) => d.value).sort((a, b) => b.value - a.value);
+        const tree = (d) => treemap()
             .tile(treemapResquarify)
-            .size([_this.rw, _this.rh])
+            .size([this.rw, this.rh])
             .padding(1)
-            .round(true)(h); };
+            .round(true)(h);
         this._root = tree();
         this._scalingExtent();
         this._opacity = linear$1().domain(this._extent).range([0.5, 0.9]);
         return this;
-    };
-    /**
-     * Removes this chart from the DOM
-     */
-    Treechart.prototype.destroy = function () {
-        select(this.container).select("svg").remove();
-        return this;
-    };
+    }
     /**
      * draws the Treechart
      */
-    Treechart.prototype.draw = function () {
+    draw() {
+        super.draw();
         this._drawCanvas()
             ._drawSeries();
         return this;
-    };
+    }
     /**
      * Serialise the Treechart data
      */
-    Treechart.prototype.toString = function () {
-        var dt = this._data.series.map(function (n) { return "" + n; }).join("\n");
-        return "data:\n" + dt;
-    };
+    toString() {
+        let dt = this._data.series.map((n) => `${n}`).join("\n");
+        return `data:\n${dt}`;
+    }
     // ***** PRIVATE METHODS
-    Treechart.prototype._drawCanvas = function () {
-        var _this = this;
-        if (select(this.container).select("svg.treechart").empty()) {
-            this._id = "treechart" + Array.from(document.querySelectorAll(".treechart")).length;
-            var sg = svg(this.container, {
-                class: "treechart",
-                height: this.h,
-                id: this._id,
-                margin: this.margin,
-                width: this.w
-            });
-            this._svg = select(sg)
-                .on("click", function () { return _this.clearSelection(); });
-            this._canvas = this._svg.select(".canvas");
+    _drawCanvas() {
+        this.id = "treechart" + Array.from(document.querySelectorAll(".treechart")).length;
+        const svg = this.container.querySelector("svg");
+        if (svg) {
+            svg.classList.add("treechart");
+            svg.id = this.id;
         }
         return this;
-    };
-    Treechart.prototype._drawSeries = function () {
-        var _this = this;
-        var g = this._canvas.select("g.series");
+    }
+    _drawSeries() {
+        let g = this.canvas.select("g.series");
         if (g.empty()) {
-            g = this._canvas.append("g").attr("class", "series");
+            g = this.canvas.append("g").attr("class", "series");
         }
         g.selectAll("g.box")
             .data(this._root.leaves())
-            .join(function (enter) {
-            var leaf = enter.append("g")
+            .join((enter) => {
+            const leaf = enter.append("g")
                 .attr("class", "box")
-                .attr("transform", function (d) { return "translate(" + d.x0 + "," + d.y0 + ")"; });
+                .attr("transform", (d) => `translate(${d.x0},${d.y0})`);
             leaf.append("title")
-                .text(function (d) { return d.data.category + " -> " + d.data.label + " \n" + _this.formatValue.format(d.value); });
+                .text((d) => `${d.data.category} -> ${d.data.label} \n${this.formatValue.format(d.value)}`);
             leaf.append("rect")
-                .attr("id", function (d, i) { return _this._id + "_p" + i; })
+                .attr("id", (d, i) => `${this.id}_p${i}`)
                 .attr("class", "box")
-                .attr("fill", function (d) { return d.data.color; })
-                .attr("fill-opacity", function (d) { return _this._opacity(d.data.value); })
-                .attr("width", function (d) { return d.x1 - d.x0; })
-                .attr("height", function (d) { return d.y1 - d.y0; })
-                .on("click", function (event) { return _this._seriesClickHandler(event); });
+                .attr("fill", (d) => d.data.color)
+                .attr("fill-opacity", (d) => this._opacity(d.data.value))
+                .attr("width", (d) => d.x1 - d.x0)
+                .attr("height", (d) => d.y1 - d.y0)
+                .on("click", (event) => this._seriesClickHandler(event));
             leaf.append("clipPath")
-                .attr("id", function (d, i) { return _this._id + "_clip" + i; })
+                .attr("id", (d, i) => `${this.id}_clip${i}`)
                 .append("rect")
                 .attr("x", 0).attr("y", 0)
-                .attr("width", function (d) { return d.x1 - d.x0; })
-                .attr("height", function (d) { return d.y1 - d.y0; });
+                .attr("width", (d) => d.x1 - d.x0)
+                .attr("height", (d) => d.y1 - d.y0);
             leaf.append("text")
                 .attr("class", "box")
                 .attr("font-size", "smaller")
-                .attr("clip-path", function (d, i) { return "url(#" + _this._id + "_clip" + i + ")"; })
+                .attr("clip-path", (d, i) => `url(#${this.id}_clip${i})`)
                 .selectAll("tspan")
-                .data(function (d) { return d.data.label.split(/(?=[A-Z][a-z])|\s+/g).concat(_this.formatValue.format(d.value)); })
+                .data((d) => d.data.label.split(/(?=[A-Z][a-z])|\s+/g).concat(this.formatValue.format(d.value)))
                 .join("tspan")
                 .attr("x", 3)
-                .attr("y", function (d, i, nodes) { return (i === nodes.length - 1 ? 1 : 0) * 0.3 + 1.1 + i * 0.9 + "em"; })
-                .attr("fill-opacity", function (d, i, nodes) { return i === nodes.length - 1 ? 0.7 : null; })
-                .text(function (d) { return d; });
-        }, function (update) {
-            update.attr("transform", function (d) { return "translate(" + d.x0 + "," + d.y0 + ")"; });
-        }, function (exit) { return exit.remove(); });
+                .attr("y", (d, i, nodes) => `${(i === nodes.length - 1 ? 1 : 0) * 0.3 + 1.1 + i * 0.9}em`)
+                .attr("fill-opacity", (d, i, nodes) => i === nodes.length - 1 ? 0.7 : null)
+                .text((d) => d);
+        }, (update) => {
+            update.attr("transform", (d) => `translate(${d.x0},${d.y0})`);
+        }, (exit) => exit.remove());
         return this;
-    };
-    Treechart.prototype._nest = function (data) {
-        var keys = [];
-        for (var _i = 1; _i < arguments.length; _i++) {
-            keys[_i - 1] = arguments[_i];
-        }
-        var n = nest();
-        for (var _a = 0, keys_1 = keys; _a < keys_1.length; _a++) {
-            var key = keys_1[_a];
+    }
+    _nest(data, ...keys) {
+        const n = nest();
+        for (const key of keys) {
             n.key(key);
         }
-        function hierarchy(_a, depth) {
-            var key = _a.key, values = _a.values;
+        function hierarchy({ key, values }, depth) {
             return {
                 name: key,
                 children: depth < keys.length - 1
-                    ? values.map(function (d) { return hierarchy(d, depth + 1); })
+                    ? values.map((d) => hierarchy(d, depth + 1))
                     : values
             };
         }
-        return n.entries(data).map(function (d) { return hierarchy(d, 0); });
-    };
-    Treechart.prototype._seriesClickHandler = function (event) {
-        var _this = this;
+        return n.entries(data).map(d => hierarchy(d, 0));
+    }
+    _seriesClickHandler(event) {
         event.stopPropagation();
-        var el = event.target;
-        var exit = el === this._selected ? true : false;
+        const el = event.target;
+        const selected = this.canvas.select(".selected");
+        const exit = el === selected.node() ? true : false;
         this.clearSelection();
         if (exit) {
             return;
         }
         window.dispatchEvent(new CustomEvent("tree-selected", { detail: el }));
         selectAll("rect.box")
-            .each(function (d, i, n) {
+            .each((d, i, n) => {
             if (n[i] === el) {
                 select(el).classed("selected", true);
-                _this._selected = n[i];
             }
             else {
                 select(n[i]).classed("fade", true);
             }
         });
-    };
+    }
     /**
      * Determines the minimum and maximum extent values used by scale
      */
-    Treechart.prototype._scalingExtent = function () {
-        this._extent = extent(this._data.series, function (d) { return d.value; });
+    _scalingExtent() {
+        this._extent = extent(this._data.series, (d) => d.value);
         return this;
-    };
-    return Treechart;
-}());
+    }
+}
 
 export { Treechart };

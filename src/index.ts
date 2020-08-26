@@ -4,7 +4,7 @@ import { select, selectAll } from "d3-selection";
 import { scaleLinear, scaleOrdinal } from "d3-scale";
 import { schemePaired } from "d3-scale-chromatic";
 import { hierarchy, treemap, treemapResquarify } from "d3-hierarchy";
-import { svg, TMargin } from "@buckneri/spline";
+import { Basechart, svg, TMargin } from "@buckneri/spline";
 
 export type TTreeSeries = {
   category?: string,
@@ -25,39 +25,17 @@ export type TTreechartOptions = {
   margin: TMargin
 };
 
-export class Treechart {
-  public container: HTMLElement = document.querySelector("body") as HTMLElement;
+export class Treechart extends Basechart {
   public formatValue: Intl.NumberFormat;
-  public h: number = 200;
-  public locale: string = "en-GB";
-  public margin: TMargin = { bottom: 20, left: 20, right: 20, top: 20 };
-  public rh: number = 160;
-  public rw: number = 150;
-  public w: number = 200;
 
-  private _canvas: any;
-  private _color = scaleOrdinal(schemePaired);
   private _data: TTree = { series: [] };
   private _extent: [number, number] = [0, 0];
-  private _id: string = "";
   private _opacity: any;
   private _root: any;
-  private _selected: SVGElement | undefined;
   private _svg: any;
 
   constructor(options: TTreechartOptions) {
-    if (options.margin !== undefined) {
-      let m = options.margin;
-      m.left = isNaN(m.left) ? 0 : m.left;
-      m.right = isNaN(m.right) ? 0 : m.right;
-      m.top = isNaN(m.top) ? 0 : m.top;
-      m.bottom = isNaN(m.bottom) ? 0 : m.bottom;
-      this.margin = m;
-    }
-
-    if (options.locale !== undefined) {
-      this.locale = options.locale;
-    }
+    super(options);
 
     if (options.formatValue !== undefined) {
       this.formatValue = options.formatValue;
@@ -65,27 +43,7 @@ export class Treechart {
       this.formatValue = new Intl.NumberFormat(this.locale, { maximumFractionDigits: 2, style: "decimal" });
     }
 
-    if (options.container !== undefined) {
-      this.container = options.container;
-    }
-
-    const box: DOMRect = this.container.getBoundingClientRect();
-    this.h = box.height;
-    this.w = box.width;
-    this.rh = this.h - this.margin.top - this.margin.bottom;
-    this.rw = this.w - this.margin.left - this.margin.right;
-    
     this.data(options.data);
-  }
-
-  /**
-   * Clears selection from Treechart
-   */
-  public clearSelection(): Treechart {
-    selectAll(".selected").classed("selected", false);
-    selectAll(".fade").classed("fade", false);
-    this._selected = undefined;
-    return this;
   }
 
   /**
@@ -95,7 +53,7 @@ export class Treechart {
   public data(data: any): Treechart {
     this._data = data;
     this._data.series.forEach((item: TTreeSeries) => {
-      item.color = this._color(item.category ? item.category : item.label);
+      item.color = this.scale.color(item.category ? item.category : item.label);
     });
 
     const dataNested = { name: "root", children: this._nest(this._data.series, (d: any) => d.category, (d: any) => d.label) };
@@ -118,17 +76,11 @@ export class Treechart {
   }
 
   /**
-   * Removes this chart from the DOM
-   */
-  public destroy(): Treechart {
-    select(this.container).select("svg").remove();
-    return this;
-  }
-
-  /**
    * draws the Treechart
    */
   public draw(): Treechart {
+    super.draw();
+
     this._drawCanvas()
         ._drawSeries();
     
@@ -146,27 +98,20 @@ export class Treechart {
   // ***** PRIVATE METHODS
 
   private _drawCanvas(): Treechart {
-    if (select(this.container).select("svg.treechart").empty()) {
-      this._id = "treechart" + Array.from(document.querySelectorAll(".treechart")).length;
-      let sg: SVGElement | null = svg(this.container, {
-        class: "treechart",
-        height: this.h,
-        id: this._id,
-        margin: this.margin,
-        width: this.w
-      }) as SVGElement;
-      this._svg = select(sg)
-        .on("click", () => this.clearSelection());
-      this._canvas = this._svg.select(".canvas");
+    this.id = "treechart" + Array.from(document.querySelectorAll(".treechart")).length;
+    const svg = this.container.querySelector("svg");
+    if (svg) {
+      svg.classList.add("treechart");
+      svg.id = this.id;
     }
 
     return this;
   }
 
   private _drawSeries(): Treechart {
-    let g = this._canvas.select("g.series");
+    let g = this.canvas.select("g.series");
     if (g.empty()) {
-      g = this._canvas.append("g").attr("class", "series");
+      g = this.canvas.append("g").attr("class", "series");
     }
     
     g.selectAll("g.box")
@@ -181,7 +126,7 @@ export class Treechart {
             .text((d: any) => `${d.data.category} -> ${d.data.label} \n${this.formatValue.format(d.value)}`);
 
           leaf.append("rect")
-            .attr("id", (d: any, i: number) => `${this._id}_p${i}`)
+            .attr("id", (d: any, i: number) => `${this.id}_p${i}`)
             .attr("class", "box")
             .attr("fill", (d: any) => d.data.color)
             .attr("fill-opacity", (d: any) => this._opacity(d.data.value))
@@ -190,7 +135,7 @@ export class Treechart {
             .on("click", (event: any) => this._seriesClickHandler(event));
 
           leaf.append("clipPath")
-            .attr("id", (d: any, i: number) => `${this._id}_clip${i}`)
+            .attr("id", (d: any, i: number) => `${this.id}_clip${i}`)
             .append("rect")
               .attr("x", 0).attr("y", 0)
               .attr("width", (d: any) => d.x1 - d.x0)
@@ -199,7 +144,7 @@ export class Treechart {
           leaf.append("text")
             .attr("class", "box")
             .attr("font-size", "smaller")
-            .attr("clip-path", (d: any, i: number) => `url(#${this._id}_clip${i})`)
+            .attr("clip-path", (d: any, i: number) => `url(#${this.id}_clip${i})`)
             .selectAll("tspan")
             .data((d: any) => d.data.label.split(/(?=[A-Z][a-z])|\s+/g).concat(this.formatValue.format(d.value)))
             .join("tspan")
@@ -236,8 +181,9 @@ export class Treechart {
   private _seriesClickHandler(event: any): void {
     event.stopPropagation();
     const el = event.target;
+    const selected = this.canvas.select(".selected");
 
-    const exit = el === this._selected ? true : false;
+    const exit = el === selected.node() ? true : false;
     this.clearSelection();
     if (exit) {
       return;
@@ -247,7 +193,6 @@ export class Treechart {
       .each((d: any, i: number, n: any) => {
         if (n[i] === el) {
           select(el).classed("selected", true);
-          this._selected = n[i];
         } else {
           select(n[i]).classed("fade", true);
         }
