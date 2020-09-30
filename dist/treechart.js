@@ -36,7 +36,7 @@ function bisector(f) {
   function center(a, x, lo, hi) {
     if (lo == null) lo = 0;
     if (hi == null) hi = a.length;
-    const i = left(a, x, lo, hi);
+    const i = left(a, x, lo, hi - 1);
     return i > lo && delta(a[i - 1], x) > -delta(a[i], x) ? i - 1 : i;
   }
 
@@ -47,8 +47,13 @@ function ascendingComparator(f) {
   return (d, x) => ascending(f(d), x);
 }
 
-var ascendingBisect = bisector(ascending);
-var bisectRight = ascendingBisect.right;
+function number(x) {
+  return x === null ? NaN : +x;
+}
+
+const ascendingBisect = bisector(ascending);
+const bisectRight = ascendingBisect.right;
+const bisectCenter = bisector(number).center;
 
 function extent(values, valueof) {
   let min;
@@ -1807,13 +1812,13 @@ function interpolateRound(a, b) {
   };
 }
 
-function constant$2(x) {
+function constants(x) {
   return function() {
     return x;
   };
 }
 
-function number(x) {
+function number$1(x) {
   return +x;
 }
 
@@ -1826,7 +1831,7 @@ function identity(x) {
 function normalize(a, b) {
   return (b -= (a = +a))
       ? function(x) { return (x - a) / b; }
-      : constant$2(isNaN(b) ? NaN : 0.5);
+      : constants(isNaN(b) ? NaN : 0.5);
 }
 
 function clamper(a, b) {
@@ -1905,7 +1910,7 @@ function transformer() {
   };
 
   scale.domain = function(_) {
-    return arguments.length ? (domain = Array.from(_, number), rescale()) : domain.slice();
+    return arguments.length ? (domain = Array.from(_, number$1), rescale()) : domain.slice();
   };
 
   scale.range = function(_) {
@@ -2600,7 +2605,7 @@ function constantZero() {
   return 0;
 }
 
-function constant$3(x) {
+function constant$2(x) {
   return function() {
     return x;
   };
@@ -2767,7 +2772,7 @@ function treemap() {
   };
 
   treemap.paddingInner = function(x) {
-    return arguments.length ? (paddingInner = typeof x === "function" ? x : constant$3(+x), treemap) : paddingInner;
+    return arguments.length ? (paddingInner = typeof x === "function" ? x : constant$2(+x), treemap) : paddingInner;
   };
 
   treemap.paddingOuter = function(x) {
@@ -2775,19 +2780,19 @@ function treemap() {
   };
 
   treemap.paddingTop = function(x) {
-    return arguments.length ? (paddingTop = typeof x === "function" ? x : constant$3(+x), treemap) : paddingTop;
+    return arguments.length ? (paddingTop = typeof x === "function" ? x : constant$2(+x), treemap) : paddingTop;
   };
 
   treemap.paddingRight = function(x) {
-    return arguments.length ? (paddingRight = typeof x === "function" ? x : constant$3(+x), treemap) : paddingRight;
+    return arguments.length ? (paddingRight = typeof x === "function" ? x : constant$2(+x), treemap) : paddingRight;
   };
 
   treemap.paddingBottom = function(x) {
-    return arguments.length ? (paddingBottom = typeof x === "function" ? x : constant$3(+x), treemap) : paddingBottom;
+    return arguments.length ? (paddingBottom = typeof x === "function" ? x : constant$2(+x), treemap) : paddingBottom;
   };
 
   treemap.paddingLeft = function(x) {
-    return arguments.length ? (paddingLeft = typeof x === "function" ? x : constant$3(+x), treemap) : paddingLeft;
+    return arguments.length ? (paddingLeft = typeof x === "function" ? x : constant$2(+x), treemap) : paddingLeft;
   };
 
   return treemap;
@@ -3011,7 +3016,7 @@ EnterNode$1.prototype = {
   querySelectorAll: function(selector) { return this._parent.querySelectorAll(selector); }
 };
 
-function constant$4(x) {
+function constant$3(x) {
   return function() {
     return x;
   };
@@ -3098,7 +3103,7 @@ function selection_data$1(value, key) {
       parents = this._parents,
       groups = this._groups;
 
-  if (typeof value !== "function") value = constant$4(value);
+  if (typeof value !== "function") value = constant$3(value);
 
   for (var m = groups.length, update = new Array(m), enter = new Array(m), exit = new Array(m), j = 0; j < m; ++j) {
     var parent = parents[j],
