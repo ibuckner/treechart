@@ -4568,6 +4568,8 @@ var chart = (function (exports) {
 
   exports.Treechart = Treechart;
 
+  Object.defineProperty(exports, '__esModule', { value: true });
+
   return exports;
 
 }({}));
